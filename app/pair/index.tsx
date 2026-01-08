@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
   Dimensions,
-  Animated,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -32,24 +32,8 @@ export default function PairScreen() {
   const [copied, setCopied] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
-  // Simple fade-in animation
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-
   useEffect(() => {
     generateSessionCode();
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
   }, []);
 
   const generateSessionCode = async () => {
@@ -112,7 +96,7 @@ export default function PairScreen() {
       />
 
       {/* Header */}
-      <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
         <IconButton
           icon={<X size={24} color={colors.text.primary} />}
           onPress={handleClose}
@@ -123,7 +107,7 @@ export default function PairScreen() {
       </Animated.View>
 
       {/* Mode Switcher */}
-      <Animated.View style={[styles.modeSwitcher, { opacity: fadeAnim }]}>
+      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.modeSwitcher}>
         <TouchableOpacity
           style={[styles.modeTab, mode === 'show' && styles.modeTabActive]}
           onPress={() => setMode('show')}
@@ -154,7 +138,7 @@ export default function PairScreen() {
 
       {/* Content */}
       {mode === 'show' ? (
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.content}>
           <Card variant="gradient" style={styles.qrCard}>
             <View style={styles.qrContainer}>
               <PulseAnimation size={280} color={colors.primary[500]} />
@@ -194,7 +178,7 @@ export default function PairScreen() {
           />
         </Animated.View>
       ) : (
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.content}>
           {!permission?.granted ? (
             <Card variant="gradient" style={styles.permissionCard}>
               <Camera size={48} color={colors.primary[500]} />
