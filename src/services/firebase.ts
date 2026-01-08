@@ -111,6 +111,15 @@ export interface FirebaseSignal {
   timestamp: number;
 }
 
+// Response to a signal (confirmation/confused/reject)
+export interface FirebaseResponse {
+  id: string;
+  signalId: string;  // The signal being responded to
+  senderId: string;
+  status: 'confirmed' | 'confused' | 'rejected';
+  timestamp: number;
+}
+
 // ============================================
 // Session Management
 // ============================================
@@ -272,6 +281,77 @@ export const updateSessionActivity = async (sessionId: string): Promise<void> =>
 };
 
 // ============================================
+// Signal Response Functions (for real-time confirmations)
+// ============================================
+
+/**
+ * Get reference to responses for a session
+ */
+const getResponsesRef = (sessionId: string): DatabaseReference | null => {
+  if (!database) {
+    database = initializeFirebase();
+  }
+  if (!database) return null;
+  return ref(database, `responses/${sessionId}`);
+};
+
+/**
+ * Send a response to a signal (confirm/confused/reject)
+ */
+export const sendFirebaseResponse = async (
+  sessionId: string,
+  response: FirebaseResponse
+): Promise<boolean> => {
+  if (!database) {
+    database = initializeFirebase();
+  }
+  if (!database) return false;
+
+  try {
+    const responseRef = ref(database, `responses/${sessionId}/${response.id}`);
+    await set(responseRef, response);
+    console.log('Response sent to Firebase:', response.id, 'status:', response.status);
+    return true;
+  } catch (error) {
+    console.error('Send response error:', error);
+    return false;
+  }
+};
+
+/**
+ * Subscribe to responses (for when partner confirms/rejects your signals)
+ */
+export const subscribeToResponses = (
+  sessionId: string,
+  callback: (response: FirebaseResponse) => void,
+  afterTimestamp: number = 0
+): (() => void) => {
+  const responsesRef = getResponsesRef(sessionId);
+  if (!responsesRef) {
+    console.warn('Cannot subscribe to responses - no Firebase');
+    return () => {};
+  }
+
+  console.log('Subscribing to responses for session:', sessionId);
+  const processedIds = new Set<string>();
+
+  const unsubscribe = onValue(responsesRef, (snapshot: DataSnapshot) => {
+    if (snapshot.exists()) {
+      const responses = snapshot.val() as Record<string, FirebaseResponse>;
+      Object.values(responses).forEach(response => {
+        if (response.timestamp > afterTimestamp && !processedIds.has(response.id)) {
+          processedIds.add(response.id);
+          console.log('New response received:', response.id, 'status:', response.status);
+          callback(response);
+        }
+      });
+    }
+  });
+
+  return unsubscribe;
+};
+
+// ============================================
 // Message Types and Functions (for Secret Messages / Riddle 2)
 // ============================================
 export interface FirebaseMessage {
@@ -377,6 +457,8 @@ export default {
   subscribeToSession,
   sendFirebaseSignal,
   subscribeToSignals,
+  sendFirebaseResponse,
+  subscribeToResponses,
   closeFirebaseSession,
   updateSessionActivity,
   sendFirebaseMessage,

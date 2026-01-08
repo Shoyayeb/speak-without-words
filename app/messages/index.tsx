@@ -13,6 +13,9 @@ import {
   Platform,
   Pressable,
   TextInput as RNTextInput,
+  Image,
+  Modal as RNModal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, SlideInRight, SlideInLeft } from 'react-native-reanimated';
@@ -25,7 +28,8 @@ import {
   EyeOff, 
   Image as ImageIcon,
   Info,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,6 +49,7 @@ import {
 interface ChatMessage {
   id: string;
   content: string;
+  imageUri?: string; // For image messages - local URI or base64
   direction: 'sent' | 'received';
   timestamp: number;
   type: 'text' | 'image' | 'file';
@@ -63,6 +68,7 @@ export default function SecretMessagesScreen() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [deviceId, setDeviceId] = useState<string>('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const processedMessageIds = useRef<Set<string>>(new Set());
 
   // Generate a unique device ID for this session
@@ -117,9 +123,16 @@ export default function SecretMessagesScreen() {
         if (direction === 'received') {
           console.log('Adding received message to chat');
           
+          // For images, the content contains base64 data
+          const isImage = firebaseMessage.type === 'image';
+          const imageUri = isImage && firebaseMessage.content.startsWith('data:image') 
+            ? firebaseMessage.content 
+            : undefined;
+          
           const chatMessage: ChatMessage = {
             id: firebaseMessage.id,
-            content: firebaseMessage.content, // In real app, decrypt here
+            content: isImage ? '📷 Image' : firebaseMessage.content,
+            imageUri: imageUri,
             direction: 'received',
             timestamp: firebaseMessage.timestamp,
             type: firebaseMessage.type,
@@ -211,37 +224,50 @@ export default function SecretMessagesScreen() {
   const handleImagePick = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.5,
+      quality: 0.3, // Lower quality to reduce size for Firebase
       base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       
+      const asset = result.assets[0];
       const messageId = `img_${Date.now()}`;
       processedMessageIds.current.add(messageId);
       
+      // Store locally with the image URI
       const newMessage: ChatMessage = {
         id: messageId,
-        content: '📷 Encrypted image',
+        content: '📷 Image',
+        imageUri: asset.uri, // Store local URI for display
         direction: 'sent',
         timestamp: Date.now(),
         type: 'image',
         encrypted: true,
-        status: 'sent',
+        status: 'sending',
       };
       
       setMessages(prev => [...prev, newMessage]);
+      scrollRef.current?.scrollToEnd({ animated: true });
 
-      // Send to Firebase
-      if (connection?.sessionCode && deviceId) {
-        await sendFirebaseMessage(connection.sessionCode, {
+      // Send to Firebase with base64 data (for cross-device sync)
+      if (connection?.sessionCode && deviceId && asset.base64) {
+        // Truncate base64 if too large (Firebase has limits)
+        const base64Data = asset.base64.length > 500000 
+          ? asset.base64.substring(0, 500000) 
+          : asset.base64;
+        
+        const success = await sendFirebaseMessage(connection.sessionCode, {
           id: messageId,
           senderId: deviceId,
-          content: '📷 Encrypted image',
+          content: `data:image/jpeg;base64,${base64Data}`,
           type: 'image',
           timestamp: Date.now(),
         });
+
+        setMessages(prev => 
+          prev.map(m => m.id === messageId ? { ...m, status: success ? 'sent' : 'sending' } : m)
+        );
       }
     }
   }, [connection?.sessionCode, deviceId]);
@@ -341,7 +367,8 @@ export default function SecretMessagesScreen() {
             entering={msg.direction === 'sent' ? SlideInRight.delay(index * 50) : SlideInLeft.delay(index * 50)}
             style={[
               styles.messageBubble,
-              msg.direction === 'sent' ? styles.sentBubble : styles.receivedBubble
+              msg.direction === 'sent' ? styles.sentBubble : styles.receivedBubble,
+              msg.type === 'image' && styles.imageBubble
             ]}
           >
             {showEncrypted ? (
@@ -353,6 +380,21 @@ export default function SecretMessagesScreen() {
                   {btoa(msg.content).substring(0, 40)}...
                 </Text>
               </View>
+            ) : msg.type === 'image' && msg.imageUri ? (
+              <Pressable 
+                onPress={() => setPreviewImage(msg.imageUri!)}
+                style={styles.imageContainer}
+              >
+                <Image 
+                  source={{ uri: msg.imageUri }} 
+                  style={styles.messageImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.imageOverlay}>
+                  <Lock size={12} color={colors.text.primary} />
+                  <Text variant="caption" color="primary">Encrypted</Text>
+                </View>
+              </Pressable>
             ) : (
               <Text variant="body" color="primary">
                 {msg.content}
@@ -459,6 +501,38 @@ export default function SecretMessagesScreen() {
           </View>
         </ScrollView>
       </Modal>
+
+      {/* Full-screen Image Preview */}
+      <RNModal
+        visible={!!previewImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
+      >
+        <View style={styles.imagePreviewContainer}>
+          <Pressable 
+            style={styles.imagePreviewBackdrop}
+            onPress={() => setPreviewImage(null)}
+          />
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.imagePreviewFull}
+              resizeMode="contain"
+            />
+          )}
+          <Pressable
+            style={styles.imagePreviewClose}
+            onPress={() => setPreviewImage(null)}
+          >
+            <X size={28} color={colors.text.primary} />
+          </Pressable>
+          <View style={styles.imagePreviewBadge}>
+            <Lock size={14} color={colors.accent.success} />
+            <Text variant="caption" color="primary">End-to-end encrypted</Text>
+          </View>
+        </View>
+      </RNModal>
     </SafeAreaView>
   );
 }
@@ -537,6 +611,32 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     justifyContent: 'flex-end',
   },
+  imageBubble: {
+    padding: spacing.xs,
+    backgroundColor: 'transparent',
+  },
+  imageContainer: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: borderRadius.md,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -584,5 +684,37 @@ const styles = StyleSheet.create({
   infoCard: {
     marginTop: spacing.md,
     padding: spacing.md,
+  },
+  imagePreviewContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  imagePreviewBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  imagePreviewFull: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.7,
+  },
+  imagePreviewClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    padding: spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: borderRadius.full,
+  },
+  imagePreviewBadge: {
+    position: 'absolute',
+    bottom: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
   },
 });

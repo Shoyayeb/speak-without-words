@@ -352,16 +352,18 @@ class ConnectionService {
 
   /**
    * Send a signal to partner
+   * Returns the signal ID if successful, null if failed
    */
-  async sendSignal(entry: DeckEntry): Promise<boolean> {
+  async sendSignal(entry: DeckEntry): Promise<string | null> {
     if (!this.connection || this.connection.status !== 'connected') {
-      return false;
+      return null;
     }
 
     try {
       if (this.isFirebaseAvailable()) {
+        const signalId = await this.generateConnectionId();
         const signal: FirebaseSignal = {
-          id: await this.generateConnectionId(),
+          id: signalId,
           senderId: this.deviceId,
           entryId: entry.id,
           iconId: entry.iconId,
@@ -374,15 +376,16 @@ class ConnectionService {
         if (sent) {
           this.connection.lastActivity = Date.now();
           await this.saveConnection();
+          return signalId; // Return the signal ID for response tracking
         }
-        return sent;
+        return null;
       }
 
-      // Local-only mode - just return success
-      return true;
+      // Local-only mode - return a dummy ID
+      return `local_${Date.now()}`;
     } catch (error) {
       console.error('Send signal error:', error);
-      return false;
+      return null;
     }
   }
 

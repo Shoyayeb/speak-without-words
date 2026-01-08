@@ -49,11 +49,18 @@ import { Button, Card, IconButton, Modal, Text } from '../../src/components/ui';
 import { DeckEntry, PRESET_DECKS } from '../../src/constants/presetDecks';
 import { colors, spacing, borderRadius } from '../../src/constants/theme';
 import { useConnection } from '../../src/hooks';
+import { 
+  sendFirebaseResponse, 
+  subscribeToResponses, 
+  FirebaseResponse,
+  isFirebaseConfigured 
+} from '../../src/services/firebase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface SignalHistoryItem {
   id: string;
+  signalId?: string;  // Firebase signal ID for tracking responses
   entry: DeckEntry;
   direction: 'sent' | 'received';
   timestamp: number;
@@ -80,6 +87,8 @@ export default function ConnectScreen() {
   const [showDeckPicker, setShowDeckPicker] = useState(false);
   const [signalHistory, setSignalHistory] = useState<SignalHistoryItem[]>([]);
   const [pendingConfirmation, setPendingConfirmation] = useState<SignalHistoryItem | null>(null);
+  const [deviceId] = useState(() => `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const processedResponseIds = useRef<Set<string>>(new Set());
 
   // Pulse animation for connection indicator
   const pulseAnim = useSharedValue(1);
@@ -102,11 +111,58 @@ export default function ConnectScreen() {
     opacity: pulseAnim.value > 1.1 ? 0.6 : 1,
   }));
 
+  // Subscribe to responses from partner (when they confirm/reject our signals)
+  useEffect(() => {
+    if (!isConnected || !connection?.sessionCode) return;
+
+    const startTime = Date.now() - 60000; // Get responses from last minute
+    
+    const unsubscribe = subscribeToResponses(
+      connection.sessionCode,
+      (response: FirebaseResponse) => {
+        // Skip if we've already processed this response
+        if (processedResponseIds.current.has(response.id)) return;
+        processedResponseIds.current.add(response.id);
+
+        // Skip our own responses
+        if (response.senderId === deviceId) return;
+
+        console.log('Received response for signal:', response.signalId, 'status:', response.status);
+
+        // Update the signal in history with the response status
+        setSignalHistory(prev => 
+          prev.map(s => 
+            s.signalId === response.signalId 
+              ? { ...s, status: response.status } 
+              : s
+          )
+        );
+
+        // Haptic feedback based on response
+        switch (response.status) {
+          case 'confirmed':
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            break;
+          case 'confused':
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            break;
+          case 'rejected':
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            break;
+        }
+      },
+      startTime
+    );
+
+    return () => unsubscribe();
+  }, [isConnected, connection?.sessionCode, deviceId]);
+
   // Handle incoming signals
   useEffect(() => {
     if (realIncomingSignal) {
       const newSignal: SignalHistoryItem = {
         id: Date.now().toString(),
+        signalId: realIncomingSignal.id, // Track the Firebase signal ID
         entry: realIncomingSignal.entry,
         direction: 'received',
         timestamp: Date.now(),
@@ -129,8 +185,12 @@ export default function ConnectScreen() {
   const handleSendSignal = useCallback(async () => {
     if (!selectedEntry || !isConnected) return;
 
+    const localId = Date.now().toString();
+    
+    // Create signal with pending status (will update signalId after send)
     const newSignal: SignalHistoryItem = {
-      id: Date.now().toString(),
+      id: localId,
+      signalId: undefined, // Will be set after Firebase send
       entry: selectedEntry,
       direction: 'sent',
       timestamp: Date.now(),
@@ -139,56 +199,94 @@ export default function ConnectScreen() {
 
     setSignalHistory(prev => [newSignal, ...prev].slice(0, 20));
     
-    const success = await sendConnectionSignal(selectedEntry);
-    if (success) {
+    // Send and get the Firebase signal ID back
+    const firebaseSignalId = await sendConnectionSignal(selectedEntry);
+    if (firebaseSignalId) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Simulate partner confirmation for demo
-      setTimeout(() => {
-        setSignalHistory(prev => 
-          prev.map(s => s.id === newSignal.id ? { ...s, status: 'confirmed' as const } : s)
-        );
-      }, 1500);
+      // Update the signal with the Firebase ID so we can track responses
+      setSignalHistory(prev => 
+        prev.map(s => s.id === localId ? { ...s, signalId: firebaseSignalId } : s)
+      );
     }
     
     setSelectedEntry(null);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [selectedEntry, isConnected, sendConnectionSignal]);
 
-  const handleConfirm = useCallback(() => {
-    if (!pendingConfirmation) return;
+  const handleConfirm = useCallback(async () => {
+    if (!pendingConfirmation || !connection?.sessionCode) return;
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Send response to Firebase so partner knows we confirmed
+    if (pendingConfirmation.signalId) {
+      const response: FirebaseResponse = {
+        id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        signalId: pendingConfirmation.signalId,
+        senderId: deviceId,
+        status: 'confirmed',
+        timestamp: Date.now(),
+      };
+      await sendFirebaseResponse(connection.sessionCode, response);
+    }
+    
     setSignalHistory(prev => [
       { ...pendingConfirmation, status: 'confirmed' as const },
       ...prev
     ].slice(0, 20));
     setPendingConfirmation(null);
     clearIncomingSignal();
-  }, [pendingConfirmation, clearIncomingSignal]);
+  }, [pendingConfirmation, clearIncomingSignal, connection?.sessionCode, deviceId]);
 
-  const handleConfused = useCallback(() => {
-    if (!pendingConfirmation) return;
+  const handleConfused = useCallback(async () => {
+    if (!pendingConfirmation || !connection?.sessionCode) return;
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    
+    // Send response to Firebase
+    if (pendingConfirmation.signalId) {
+      const response: FirebaseResponse = {
+        id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        signalId: pendingConfirmation.signalId,
+        senderId: deviceId,
+        status: 'confused',
+        timestamp: Date.now(),
+      };
+      await sendFirebaseResponse(connection.sessionCode, response);
+    }
+    
     setSignalHistory(prev => [
       { ...pendingConfirmation, status: 'confused' as const },
       ...prev
     ].slice(0, 20));
     setPendingConfirmation(null);
     clearIncomingSignal();
-  }, [pendingConfirmation, clearIncomingSignal]);
+  }, [pendingConfirmation, clearIncomingSignal, connection?.sessionCode, deviceId]);
 
-  const handleReject = useCallback(() => {
-    if (!pendingConfirmation) return;
+  const handleReject = useCallback(async () => {
+    if (!pendingConfirmation || !connection?.sessionCode) return;
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    
+    // Send response to Firebase
+    if (pendingConfirmation.signalId) {
+      const response: FirebaseResponse = {
+        id: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        signalId: pendingConfirmation.signalId,
+        senderId: deviceId,
+        status: 'rejected',
+        timestamp: Date.now(),
+      };
+      await sendFirebaseResponse(connection.sessionCode, response);
+    }
+    
     setSignalHistory(prev => [
       { ...pendingConfirmation, status: 'rejected' as const },
       ...prev
     ].slice(0, 20));
     setPendingConfirmation(null);
     clearIncomingSignal();
-  }, [pendingConfirmation, clearIncomingSignal]);
+  }, [pendingConfirmation, clearIncomingSignal, connection?.sessionCode, deviceId]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();

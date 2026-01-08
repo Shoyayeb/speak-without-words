@@ -20,7 +20,7 @@ interface UseConnectionReturn {
   createSession: () => Promise<{ sessionCode: string; qrData: string } | null>;
   connectWithQR: (qrData: string) => Promise<boolean>;
   checkForConnection: () => Promise<boolean>;
-  sendSignal: (entry: DeckEntry) => Promise<boolean>;
+  sendSignal: (entry: DeckEntry) => Promise<string | null>; // Returns signal ID or null
   disconnect: () => Promise<void>;
   clearIncomingSignal: () => void;
   clearError: () => void;
@@ -119,12 +119,12 @@ export function useConnection(): UseConnectionReturn {
     return connected;
   }, []);
 
-  const sendSignal = useCallback(async (entry: DeckEntry) => {
-    const success = await connectionService.sendSignal(entry);
-    if (!success) {
+  const sendSignal = useCallback(async (entry: DeckEntry): Promise<string | null> => {
+    const signalId = await connectionService.sendSignal(entry);
+    if (!signalId) {
       setError('Failed to send signal');
     }
-    return success;
+    return signalId;
   }, []);
 
   const disconnect = useCallback(async () => {
