@@ -1,6 +1,12 @@
+/**
+ * Learn Screen - Riddle 2 Education
+ * "How secrets traveled unseen through history"
+ * Educational content about cryptography and secret communication
+ */
+
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Award, Gamepad2, History } from 'lucide-react-native';
+import { Award, History, Lock, Key, Shield, ScrollText } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
     SafeAreaView,
@@ -52,13 +58,13 @@ export default function LearnScreen() {
       >
         {/* Header */}
         <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
-          <Text variant="h1">Learn</Text>
+          <Text variant="h1">Secrets</Text>
           <Text variant="body" color="secondary">
-            Discover how secrets traveled through history
+            How messages traveled unseen through history
           </Text>
         </Animated.View>
 
-        {/* Featured Game Card */}
+        {/* Encryption Overview Card */}
         <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
           <Card variant="gradient" glowColor={colors.primary[500]}>
             <LinearGradient
@@ -68,21 +74,43 @@ export default function LearnScreen() {
               style={styles.featuredGradient}
             >
               <View style={styles.featuredContent}>
-                <Gamepad2 size={40} color={colors.text.primary} />
+                <View style={styles.iconRow}>
+                  <Lock size={28} color={colors.text.primary} />
+                  <Key size={28} color={colors.primary[500]} style={{ marginLeft: -8 }} />
+                </View>
                 <Text variant="h2" style={styles.featuredTitle}>
-                  Try Morse Code
+                  The Art of Secret Messages
                 </Text>
                 <Text variant="body" color="secondary" align="center">
-                  Learn the dots and dashes that changed communication forever
+                  From ancient ciphers to modern encryption, humans have always found ways to communicate privately
                 </Text>
-                <Button
-                  title="Play Now"
-                  onPress={() => handlePlayGame('morse')}
-                  variant="secondary"
-                  style={styles.playButton}
-                />
+                <View style={styles.cryptoInfo}>
+                  <View style={styles.cryptoItem}>
+                    <Shield size={20} color={colors.primary[500]} />
+                    <Text variant="caption" color="primary">Military Secrets</Text>
+                  </View>
+                  <View style={styles.cryptoItem}>
+                    <ScrollText size={20} color={colors.primary[500]} />
+                    <Text variant="caption" color="primary">Hidden Messages</Text>
+                  </View>
+                </View>
               </View>
             </LinearGradient>
+          </Card>
+        </Animated.View>
+
+        {/* Quick Fact Card */}
+        <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.section}>
+          <Card variant="elevated">
+            <View style={styles.factCard}>
+              <Text style={styles.factEmoji}>🔐</Text>
+              <View style={styles.factInfo}>
+                <Text variant="label" color="primary">DID YOU KNOW?</Text>
+                <Text variant="body" color="secondary">
+                  The word "cryptography" comes from Greek: "kryptós" (hidden) + "graphein" (to write)
+                </Text>
+              </View>
+            </View>
           </Card>
         </Animated.View>
 
@@ -95,7 +123,7 @@ export default function LearnScreen() {
             </Text>
           </View>
           <Text variant="body" color="secondary">
-            Throughout history, secrets have traveled unseen through ingenious methods
+            Explore how secrets have been protected throughout the ages
           </Text>
         </Animated.View>
 
@@ -139,7 +167,7 @@ export default function LearnScreen() {
 
             {selectedModule.hasGame && selectedModule.gameType && selectedModule.gameType !== 'puzzle' && (
               <Button
-                title={`Play ${selectedModule.title} Game`}
+                title={`Try ${selectedModule.title} Challenge`}
                 onPress={() => handlePlayGame(selectedModule.gameType as 'morse' | 'semaphore' | 'cipher')}
                 variant="primary"
                 fullWidth
@@ -169,10 +197,10 @@ export default function LearnScreen() {
               {gameScore}/5
             </Text>
             <Text variant="body" color="secondary" align="center" style={styles.completeText}>
-              You've learned the basics of Morse code!
+              You've learned how secrets were hidden!
             </Text>
             <Button
-              title="Play Again"
+              title="Try Again"
               onPress={() => setGameScore(null)}
               variant="primary"
               style={styles.playAgainButton}
@@ -230,13 +258,34 @@ const styles = StyleSheet.create({
   featuredContent: {
     alignItems: 'center',
   },
-  featuredTitle: {
-    marginTop: spacing.md,
+  iconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  playButton: {
+  featuredTitle: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  cryptoInfo: {
+    flexDirection: 'row',
     marginTop: spacing.lg,
-    minWidth: 150,
+    gap: spacing.xl,
+  },
+  cryptoItem: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  factCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  factEmoji: {
+    fontSize: 32,
+  },
+  factInfo: {
+    flex: 1,
   },
   timeline: {
     paddingHorizontal: spacing.lg,

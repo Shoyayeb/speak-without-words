@@ -9,26 +9,25 @@
  * 2. Create a new project (or use existing)
  * 3. Enable Realtime Database (not Firestore)
  * 4. Set database rules to allow read/write (for demo only!)
- * 5. Copy your config and paste below
+ * 5. Create .env file with your Firebase config (see .env.example)
  */
 
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { DatabaseReference, DataSnapshot, get, getDatabase, onValue, ref, remove, set, update } from 'firebase/database';
+import { DatabaseReference, DataSnapshot, get, getDatabase, onValue, push, ref, remove, set, update } from 'firebase/database';
 
 // ============================================
-// 🔧 FIREBASE CONFIGURATION
+// 🔧 FIREBASE CONFIGURATION FROM ENV
 // ============================================
-// Replace with your Firebase config from the console
-// Go to: Project Settings > General > Your apps > Web app
+// These values come from .env file (EXPO_PUBLIC_ prefix makes them available in client)
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDrgPPglqdAsvlJ4uFMijbEoxnpmR8dfQg",
-  authDomain: "speak-without-words.firebaseapp.com",
-  databaseURL: "https://speak-without-words-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "speak-without-words",
-  storageBucket: "speak-without-words.firebasestorage.app",
-  messagingSenderId: "444519523528",
-  appId: "1:444519523528:web:b062f5b00a336e709231fd",
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+  databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL || '',
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
 };
 
 // ============================================
@@ -272,6 +271,101 @@ export const updateSessionActivity = async (sessionId: string): Promise<void> =>
   }
 };
 
+// ============================================
+// Message Types and Functions (for Secret Messages / Riddle 2)
+// ============================================
+export interface FirebaseMessage {
+  id: string;
+  senderId: string;
+  content: string;  // Encrypted content
+  type: 'text' | 'image' | 'file';
+  timestamp: number;
+  iv?: string;  // Initialization vector for decryption
+}
+
+/**
+ * Get reference to messages for a session
+ */
+export const getMessagesRef = (sessionId: string): DatabaseReference | null => {
+  if (!database) {
+    database = initializeFirebase();
+  }
+  if (!database) return null;
+  return ref(database, `messages/${sessionId}`);
+};
+
+/**
+ * Send an encrypted message
+ */
+export const sendFirebaseMessage = async (
+  sessionId: string,
+  message: FirebaseMessage
+): Promise<boolean> => {
+  if (!database) {
+    database = initializeFirebase();
+  }
+  if (!database) return false;
+
+  try {
+    const messageRef = ref(database, `messages/${sessionId}/${message.id}`);
+    await set(messageRef, message);
+    console.log('Message sent to Firebase:', message.id);
+    return true;
+  } catch (error) {
+    console.error('Send message error:', error);
+    return false;
+  }
+};
+
+/**
+ * Subscribe to messages for real-time updates
+ */
+export const subscribeToMessages = (
+  sessionId: string,
+  callback: (message: FirebaseMessage) => void,
+  afterTimestamp: number = 0
+): (() => void) => {
+  const messagesRef = getMessagesRef(sessionId);
+  if (!messagesRef) {
+    console.warn('Cannot subscribe to messages - no Firebase');
+    return () => {};
+  }
+
+  console.log('Subscribing to messages for session:', sessionId);
+  
+  const processedIds = new Set<string>();
+  
+  const unsubscribe = onValue(messagesRef, (snapshot: DataSnapshot) => {
+    if (snapshot.exists()) {
+      const messages = snapshot.val() as Record<string, FirebaseMessage>;
+      Object.values(messages).forEach(message => {
+        // Only process new messages we haven't seen
+        if (message.timestamp > afterTimestamp && !processedIds.has(message.id)) {
+          processedIds.add(message.id);
+          console.log('New message received:', message.id);
+          callback(message);
+        }
+      });
+    }
+  });
+
+  return unsubscribe;
+};
+
+/**
+ * Delete all messages for a session
+ */
+export const clearFirebaseMessages = async (sessionId: string): Promise<void> => {
+  const messagesRef = getMessagesRef(sessionId);
+  if (!messagesRef) return;
+
+  try {
+    await remove(messagesRef);
+  } catch (error) {
+    console.error('Clear messages error:', error);
+  }
+};
+
 // Initialize on import
 initializeFirebase();
 
@@ -285,4 +379,7 @@ export default {
   subscribeToSignals,
   closeFirebaseSession,
   updateSessionActivity,
+  sendFirebaseMessage,
+  subscribeToMessages,
+  clearFirebaseMessages,
 };

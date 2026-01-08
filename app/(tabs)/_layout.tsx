@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
-import { BookOpen, Radio, Settings } from 'lucide-react-native';
+import { MessageCircle, History, Settings } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors, spacing } from '../../src/constants/theme';
@@ -25,18 +25,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Connect',
+          title: 'Speak',
           tabBarIcon: ({ color, size }) => (
-            <Radio size={size} color={color} strokeWidth={2} />
+            <MessageCircle size={size} color={color} strokeWidth={2} />
           ),
         }}
       />
       <Tabs.Screen
         name="learn"
         options={{
-          title: 'Learn',
+          title: 'Secrets',
           tabBarIcon: ({ color, size }) => (
-            <BookOpen size={size} color={color} strokeWidth={2} />
+            <History size={size} color={color} strokeWidth={2} />
           ),
         }}
       />

@@ -15,7 +15,7 @@ import {
   TextInput as RNTextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeInDown, SlideInRight, SlideInLeft } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInRight, SlideInLeft } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
   Send, 
@@ -24,7 +24,6 @@ import {
   Eye, 
   EyeOff, 
   Image as ImageIcon,
-  FileText,
   Info,
   ArrowLeft
 } from 'lucide-react-native';
@@ -32,10 +31,16 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 
-import { Text, Button, Card, IconButton, Modal, TextInput } from '../../src/components/ui';
+import { Text, Button, Card, IconButton, Modal } from '../../src/components/ui';
 import { colors, spacing, borderRadius } from '../../src/constants/theme';
 import { useConnection } from '../../src/hooks';
-import encryptedMessaging, { DecryptedMessage } from '../../src/services/EncryptedMessaging';
+import encryptedMessaging from '../../src/services/EncryptedMessaging';
+import { 
+  sendFirebaseMessage, 
+  subscribeToMessages, 
+  FirebaseMessage,
+  isFirebaseConfigured 
+} from '../../src/services/firebase';
 
 interface ChatMessage {
   id: string;
@@ -57,32 +62,114 @@ export default function SecretMessagesScreen() {
   const [showEncrypted, setShowEncrypted] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [sending, setSending] = useState(false);
+  const [deviceId, setDeviceId] = useState<string>('');
+  const processedMessageIds = useRef<Set<string>>(new Set());
 
-  // Demo messages to show encryption working
+  // Generate a unique device ID for this session
   useEffect(() => {
-    if (isConnected) {
-      // Initialize with a welcome message
+    const id = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setDeviceId(id);
+  }, []);
+
+  // Subscribe to incoming messages from Firebase
+  useEffect(() => {
+    if (!isConnected || !connection?.sessionCode || !deviceId) {
+      console.log('Not subscribing to messages:', { isConnected, sessionCode: connection?.sessionCode, deviceId });
+      return;
+    }
+
+    const sessionId = connection.sessionCode;
+    console.log('Setting up message subscription for session:', sessionId);
+
+    // Add welcome message if this is a fresh chat
+    if (messages.length === 0) {
       setMessages([{
         id: 'welcome',
         content: '🔐 End-to-end encrypted chat established. Only you and your partner can read these messages.',
         direction: 'received',
-        timestamp: Date.now(),
+        timestamp: Date.now() - 1000,
         type: 'text',
         encrypted: true,
         status: 'delivered',
       }]);
+      processedMessageIds.current.add('welcome');
     }
-  }, [isConnected]);
+
+    const subscriptionStartTime = Date.now() - 60000; // Get messages from last minute
+    
+    const unsubscribe = subscribeToMessages(
+      sessionId,
+      (firebaseMessage: FirebaseMessage) => {
+        console.log('Received Firebase message:', firebaseMessage.id, 'from:', firebaseMessage.senderId);
+        
+        // Skip if we've already processed this message
+        if (processedMessageIds.current.has(firebaseMessage.id)) {
+          console.log('Message already processed, skipping:', firebaseMessage.id);
+          return;
+        }
+        
+        processedMessageIds.current.add(firebaseMessage.id);
+
+        // Determine direction based on sender
+        const direction = firebaseMessage.senderId === deviceId ? 'sent' : 'received';
+        
+        // Only add if it's a received message (sent ones are already in state)
+        if (direction === 'received') {
+          console.log('Adding received message to chat');
+          
+          const chatMessage: ChatMessage = {
+            id: firebaseMessage.id,
+            content: firebaseMessage.content, // In real app, decrypt here
+            direction: 'received',
+            timestamp: firebaseMessage.timestamp,
+            type: firebaseMessage.type,
+            encrypted: true,
+            status: 'delivered',
+          };
+
+          setMessages(prev => {
+            // Check if message already exists
+            if (prev.some(m => m.id === chatMessage.id)) {
+              return prev;
+            }
+            return [...prev, chatMessage].sort((a, b) => a.timestamp - b.timestamp);
+          });
+
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Scroll to bottom
+          setTimeout(() => {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        }
+      },
+      subscriptionStartTime
+    );
+
+    return () => {
+      console.log('Cleaning up message subscription');
+      unsubscribe();
+    };
+  }, [isConnected, connection?.sessionCode, deviceId]);
 
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !isConnected) return;
+    if (!inputText.trim() || !isConnected || !connection?.sessionCode || !deviceId) {
+      console.log('Cannot send:', { inputText: !!inputText.trim(), isConnected, sessionCode: connection?.sessionCode, deviceId });
+      return;
+    }
 
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const messageContent = inputText.trim();
+    
+    // Add to processed to prevent showing our own message twice
+    processedMessageIds.current.add(messageId);
+
     const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content: inputText.trim(),
+      id: messageId,
+      content: messageContent,
       direction: 'sent',
       timestamp: Date.now(),
       type: 'text',
@@ -93,33 +180,37 @@ export default function SecretMessagesScreen() {
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
 
-    // Simulate encryption and sending
-    setTimeout(() => {
-      setMessages(prev => 
-        prev.map(m => m.id === newMessage.id ? { ...m, status: 'sent' as const } : m)
-      );
-      setSending(false);
+    // Send to Firebase
+    const firebaseMessage: FirebaseMessage = {
+      id: messageId,
+      senderId: deviceId,
+      content: messageContent, // In real app, encrypt here
+      type: 'text',
+      timestamp: Date.now(),
+    };
 
-      // Simulate received response for demo
-      setTimeout(() => {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          content: '✓ Message received securely',
-          direction: 'received',
-          timestamp: Date.now(),
-          type: 'text',
-          encrypted: true,
-          status: 'delivered',
-        }]);
-      }, 1000);
-    }, 500);
+    console.log('Sending message to Firebase:', messageId);
+    const success = await sendFirebaseMessage(connection.sessionCode, firebaseMessage);
+
+    // Update message status
+    setMessages(prev => 
+      prev.map(m => m.id === messageId ? { ...m, status: success ? 'sent' : 'sending' } : m)
+    );
+    
+    setSending(false);
+
+    if (success) {
+      console.log('Message sent successfully');
+    } else {
+      console.error('Failed to send message');
+    }
 
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, [inputText, isConnected]);
+  }, [inputText, isConnected, connection?.sessionCode, deviceId]);
 
   const handleImagePick = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.5,
       base64: true,
     });
@@ -127,8 +218,11 @@ export default function SecretMessagesScreen() {
     if (!result.canceled && result.assets[0]) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       
+      const messageId = `img_${Date.now()}`;
+      processedMessageIds.current.add(messageId);
+      
       const newMessage: ChatMessage = {
-        id: Date.now().toString(),
+        id: messageId,
         content: '📷 Encrypted image',
         direction: 'sent',
         timestamp: Date.now(),
@@ -138,8 +232,19 @@ export default function SecretMessagesScreen() {
       };
       
       setMessages(prev => [...prev, newMessage]);
+
+      // Send to Firebase
+      if (connection?.sessionCode && deviceId) {
+        await sendFirebaseMessage(connection.sessionCode, {
+          id: messageId,
+          senderId: deviceId,
+          content: '📷 Encrypted image',
+          type: 'image',
+          timestamp: Date.now(),
+        });
+      }
     }
-  }, []);
+  }, [connection?.sessionCode, deviceId]);
 
   const encryptionInfo = encryptedMessaging.getEncryptionInfo();
 
@@ -189,7 +294,7 @@ export default function SecretMessagesScreen() {
             <Text variant="h3">Secret Messages</Text>
           </View>
           <Text variant="caption" color="secondary">
-            End-to-end encrypted
+            Session: {connection?.sessionCode || 'N/A'}
           </Text>
         </View>
         <IconButton
@@ -213,6 +318,15 @@ export default function SecretMessagesScreen() {
           )}
         </Pressable>
       </Animated.View>
+
+      {/* Firebase Status */}
+      {!isFirebaseConfigured() && (
+        <View style={styles.warningBanner}>
+          <Text variant="caption" color="primary">
+            ⚠️ Firebase not configured - messages won't sync
+          </Text>
+        </View>
+      )}
 
       {/* Messages */}
       <ScrollView 
@@ -240,7 +354,7 @@ export default function SecretMessagesScreen() {
                 </Text>
               </View>
             ) : (
-              <Text variant="body" color={msg.direction === 'sent' ? 'primary' : 'primary'}>
+              <Text variant="body" color="primary">
                 {msg.content}
               </Text>
             )}
@@ -283,6 +397,7 @@ export default function SecretMessagesScreen() {
               placeholderTextColor={colors.text.muted}
               multiline
               maxLength={1000}
+              onSubmitEditing={handleSend}
             />
           </View>
           <IconButton
@@ -377,6 +492,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     backgroundColor: colors.accent.success + '15',
   },
+  warningBanner: {
+    backgroundColor: colors.accent.warning + '30',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
   messagesContainer: {
     flex: 1,
   },
@@ -397,7 +518,7 @@ const styles = StyleSheet.create({
   },
   receivedBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.surface.elevated,
+    backgroundColor: colors.surface.default,
     borderBottomLeftRadius: 4,
   },
   encryptedLabel: {
@@ -427,7 +548,7 @@ const styles = StyleSheet.create({
   },
   textInputWrapper: {
     flex: 1,
-    backgroundColor: colors.surface.card,
+    backgroundColor: colors.surface.default,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
