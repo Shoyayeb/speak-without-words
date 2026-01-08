@@ -2,7 +2,42 @@ import * as Crypto from 'expo-crypto';
 import nacl from 'tweetnacl';
 import naclUtil from 'tweetnacl-util';
 import { DeckEntry } from '../constants/presetDecks';
-import { GestureType, SignalType, ConfirmationStatus } from '../constants/signals';
+import { GestureType, SignalType } from '../constants/signals';
+
+// Set up PRNG for TweetNaCl using expo-crypto
+// This is needed because React Native doesn't have a built-in PRNG
+let randomBytesCache: Uint8Array | null = null;
+let randomBytesCacheIndex = 0;
+const CACHE_SIZE = 256;
+
+// Pre-fill the cache with random bytes
+const fillRandomCache = async () => {
+  const bytes = await Crypto.getRandomBytesAsync(CACHE_SIZE);
+  randomBytesCache = new Uint8Array(bytes);
+  randomBytesCacheIndex = 0;
+};
+
+// Synchronous random bytes using cached values
+const getRandomBytesSync = (n: number): Uint8Array => {
+  if (!randomBytesCache || randomBytesCacheIndex + n > CACHE_SIZE) {
+    throw new Error('Random bytes cache not initialized or exhausted. Call initCrypto() first.');
+  }
+  const bytes = randomBytesCache.slice(randomBytesCacheIndex, randomBytesCacheIndex + n);
+  randomBytesCacheIndex += n;
+  return bytes;
+};
+
+// Initialize the crypto system
+export const initCrypto = async (): Promise<void> => {
+  await fillRandomCache();
+  // Set TweetNaCl's random byte generator
+  nacl.setPRNG((x: Uint8Array, n: number) => {
+    const randomBytes = getRandomBytesSync(n);
+    for (let i = 0; i < n; i++) {
+      x[i] = randomBytes[i];
+    }
+  });
+};
 
 // Session types
 export interface Session {
@@ -43,13 +78,19 @@ export const generateSessionId = async (): Promise<string> => {
     .slice(0, 6);
 };
 
-// Generate key pair for session
+// Generate key pair for session - requires initCrypto to be called first
 export const generateKeyPair = (): nacl.BoxKeyPair => {
-  return nacl.box.keyPair();
+  const keyPair = nacl.box.keyPair();
+  // Refill cache in background for next use
+  fillRandomCache().catch(console.error);
+  return keyPair;
 };
 
 // Create a new session
 export const createSession = async (): Promise<Session> => {
+  // Initialize crypto system with PRNG
+  await initCrypto();
+  
   const id = await generateSessionId();
   const keyPair = generateKeyPair();
   const now = Date.now();

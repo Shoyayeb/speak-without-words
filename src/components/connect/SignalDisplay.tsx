@@ -1,23 +1,23 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withSequence,
-  withDelay,
-  Easing,
-  interpolate,
-  runOnJS,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Text } from '../ui/Text';
-import { Card } from '../ui/Card';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect } from 'react';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import Animated, {
+    Easing,
+    interpolate,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 import { DeckEntry } from '../../constants/presetDecks';
 import { ConfirmationStatus } from '../../constants/signals';
+import { borderRadius, colors, spacing } from '../../constants/theme';
+import { Card } from '../ui/Card';
+import { Text } from '../ui/Text';
 
 interface SignalDisplayProps {
   signal?: DeckEntry | null;

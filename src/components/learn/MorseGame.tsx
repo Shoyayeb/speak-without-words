@@ -1,10 +1,10 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Text } from '../ui/Text';
+import React, { useCallback, useRef, useState } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
+import { colors, spacing } from '../../constants/theme';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import { Text } from '../ui/Text';
 
 interface MorseGameProps {
   onComplete: (score: number) => void;

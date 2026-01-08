@@ -1,18 +1,16 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Check, HelpCircle, X } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
+import { borderRadius, colors, spacing } from '../../constants/theme';
 import { Text } from '../ui/Text';
-import { colors, spacing, borderRadius } from '../../constants/theme';
-import { ConfirmationStatus } from '../../constants/signals';
 
 interface ConfirmButtonsProps {
   onConfirm: () => void;

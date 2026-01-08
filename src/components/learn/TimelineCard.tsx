@@ -1,16 +1,16 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Play, ChevronRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { Text } from '../ui/Text';
-import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ChevronRight, Play } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 import { LearningModule } from '../../constants/historicalData';
+import { borderRadius, colors, spacing } from '../../constants/theme';
+import { Text } from '../ui/Text';
 
 interface TimelineCardProps {
   module: LearningModule;

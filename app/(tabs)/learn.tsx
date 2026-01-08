@@ -1,19 +1,19 @@
-import React, { useState, useCallback } from 'react';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Award, Gamepad2, History } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { History, Gamepad2, Award } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
 
-import { Text, Button, Card, Modal } from '../../src/components/ui';
-import { TimelineCard, MorseGame } from '../../src/components/learn';
-import { colors, spacing, borderRadius } from '../../src/constants/theme';
+import { MorseGame, TimelineCard } from '../../src/components/learn';
+import { Button, Card, Modal, Text } from '../../src/components/ui';
 import { HISTORICAL_CODES, LearningModule } from '../../src/constants/historicalData';
+import { borderRadius, colors, spacing } from '../../src/constants/theme';
 
 export default function LearnScreen() {
   const [selectedModule, setSelectedModule] = useState<LearningModule | null>(null);

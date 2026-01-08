@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import signalService, { Session, Signal, QRCodeData, createQRCodeData } from '../services/SignalService';
+import { useCallback, useEffect, useState } from 'react';
 import { DeckEntry } from '../constants/presetDecks';
+import signalService, { QRCodeData, Session, Signal, createQRCodeData } from '../services/SignalService';
 
 interface UseSignalReturn {
   session: Session | null;

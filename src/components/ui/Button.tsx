@@ -1,20 +1,18 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-  ActivityIndicator,
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    ViewStyle
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring
 } from 'react-native-reanimated';
-import { colors, spacing, borderRadius, typography } from '../../constants/theme';
+import { borderRadius, colors, spacing, typography } from '../../constants/theme';
 
 interface ButtonProps {
   title: string;

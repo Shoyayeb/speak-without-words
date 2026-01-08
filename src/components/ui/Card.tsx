@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
+import { borderRadius, colors, shadows, spacing } from '../../constants/theme';
 
 interface CardProps {
   children: React.ReactNode;

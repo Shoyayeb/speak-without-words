@@ -1,17 +1,17 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Text } from '../ui/Text';
-import { colors, spacing, borderRadius, shadows } from '../../constants/theme';
+import React from 'react';
+import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 import { DeckEntry } from '../../constants/presetDecks';
+import { borderRadius, colors, spacing } from '../../constants/theme';
+import { Text } from '../ui/Text';
 
 interface DeckGridProps {
   entries: DeckEntry[];

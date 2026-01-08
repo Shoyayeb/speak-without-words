@@ -1,32 +1,31 @@
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Switch,
-  Linking,
-} from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  User,
-  Bell,
-  Vibrate,
-  Volume2,
-  Shield,
-  HelpCircle,
-  Info,
-  ChevronRight,
-  Moon,
-  Eye,
-  Trash2,
-  Github,
+    ChevronRight,
+    Eye,
+    Github,
+    HelpCircle,
+    Info,
+    Moon,
+    Shield,
+    Trash2,
+    User,
+    Vibrate,
+    Volume2
 } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import React, { useState } from 'react';
+import {
+    Linking,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    View,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { Text, Card, Button } from '../../src/components/ui';
-import { colors, spacing, borderRadius } from '../../src/constants/theme';
+import { Card, Text } from '../../src/components/ui';
+import { colors, spacing } from '../../src/constants/theme';
 
 interface SettingRowProps {
   icon: React.ReactNode;

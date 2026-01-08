@@ -1,18 +1,18 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  Easing,
-} from 'react-native-reanimated';
-import { Wifi, WifiOff, RefreshCw } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { RefreshCw, Wifi, WifiOff } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming,
+} from 'react-native-reanimated';
+import { CONNECTION_STATES, ConnectionState } from '../../constants/signals';
+import { borderRadius, colors, spacing } from '../../constants/theme';
 import { Text } from '../ui/Text';
-import { colors, spacing, borderRadius } from '../../constants/theme';
-import { ConnectionState, CONNECTION_STATES } from '../../constants/signals';
 
 interface ConnectionStatusProps {
   state: ConnectionState;

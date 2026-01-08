@@ -1,18 +1,18 @@
 import React from 'react';
 import {
-  TextInput as RNTextInput,
-  View,
-  StyleSheet,
-  ViewStyle,
-  TextInputProps as RNTextInputProps,
+    TextInput as RNTextInput,
+    TextInputProps as RNTextInputProps,
+    StyleSheet,
+    View,
+    ViewStyle,
 } from 'react-native';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
+import { borderRadius, colors, spacing, typography } from '../../constants/theme';
 import { Text } from './Text';
-import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 
 interface TextInputProps extends RNTextInputProps {
   label?: string;

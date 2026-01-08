@@ -1,8 +1,8 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Radio, BookOpen, Settings } from 'lucide-react-native';
+import { Tabs } from 'expo-router';
+import { BookOpen, Radio, Settings } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 import { colors, spacing } from '../../src/constants/theme';
 
 export default function TabLayout() {

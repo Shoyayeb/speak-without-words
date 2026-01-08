@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Deck, DeckEntry, PRESET_DECKS } from '../../constants/presetDecks';
+import { Deck, PRESET_DECKS } from '../../constants/presetDecks';
 
 const STORAGE_KEYS = {
   DECKS: 'speak_without_words_decks',

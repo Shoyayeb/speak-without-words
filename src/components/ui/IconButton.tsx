@@ -1,17 +1,17 @@
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
-  TouchableOpacity,
-  StyleSheet,
-  ViewStyle,
+    StyleSheet,
+    TouchableOpacity,
+    ViewStyle,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { colors, borderRadius, shadows } from '../../constants/theme';
+import { borderRadius, colors, shadows } from '../../constants/theme';
 
 interface IconButtonProps {
   icon: React.ReactNode;

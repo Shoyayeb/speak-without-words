@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, StyleSheet, Modal as RNModal, TouchableWithoutFeedback, Dimensions } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import React from 'react';
+import { Dimensions, Modal as RNModal, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { borderRadius, colors, spacing } from '../../constants/theme';
 
 interface ModalProps {
   visible: boolean;

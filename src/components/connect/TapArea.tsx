@@ -1,19 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  Pressable, 
-  Animated, 
-  PanResponder,
-  GestureResponderEvent,
-  PanResponderGestureState,
-} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Text } from '../ui/Text';
-import { SignalRipple } from '../ui/Animations';
-import { colors, spacing, borderRadius } from '../../constants/theme';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+    Animated,
+    PanResponder,
+    StyleSheet,
+    View
+} from 'react-native';
 import { GestureType } from '../../constants/signals';
+import { borderRadius, colors, spacing } from '../../constants/theme';
+import { SignalRipple } from '../ui/Animations';
+import { Text } from '../ui/Text';
 
 interface TapAreaProps {
   onGesture: (gesture: GestureType) => void;

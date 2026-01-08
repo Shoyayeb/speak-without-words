@@ -88,11 +88,11 @@ export const SIGNAL_ICONS = [
 // Default deck icons for quick setup
 export const DEFAULT_DECK_ICONS = ['👁️', '🚶', '⚠️', '✅', '❌', '💚'];
 
-export const CONNECTION_STATES = {
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+
+export const CONNECTION_STATES: Record<string, ConnectionState> = {
   DISCONNECTED: 'disconnected',
   CONNECTING: 'connecting',
   CONNECTED: 'connected',
   RECONNECTING: 'reconnecting',
-} as const;
-
-export type ConnectionState = typeof CONNECTION_STATES[keyof typeof CONNECTION_STATES];
+};

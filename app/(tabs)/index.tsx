@@ -1,39 +1,58 @@
-import React, { useState, useCallback } from 'react';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { QrCode, Zap } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Dimensions,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { QrCode, Zap, Users } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
 
-import { Text, Button, Card, IconButton, Modal } from '../../src/components/ui';
 import {
-  DeckGrid,
-  SignalDisplay,
-  TapArea,
-  ConfirmButtons,
-  ConnectionStatus,
+    ConfirmButtons,
+    ConnectionStatus,
+    DeckGrid,
+    SignalDisplay,
+    TapArea,
 } from '../../src/components/connect';
-import { colors, spacing, borderRadius } from '../../src/constants/theme';
-import { PRESET_DECKS, DeckEntry } from '../../src/constants/presetDecks';
-import { GestureType, CONNECTION_STATES, ConnectionState } from '../../src/constants/signals';
+import { Button, Card, IconButton, Modal, Text } from '../../src/components/ui';
+import { DeckEntry, PRESET_DECKS } from '../../src/constants/presetDecks';
+import { GestureType } from '../../src/constants/signals';
+import { colors, spacing } from '../../src/constants/theme';
+import { useConnection } from '../../src/hooks';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ConnectScreen() {
   const router = useRouter();
-  const [connectionState, setConnectionState] = useState<ConnectionState>(CONNECTION_STATES.DISCONNECTED);
+  
+  // Use the real connection hook
+  const { 
+    connection, 
+    status: connectionStatus, 
+    isConnected, 
+    sendSignal: sendConnectionSignal,
+    incomingSignal: realIncomingSignal,
+    clearIncomingSignal,
+    disconnect 
+  } = useConnection();
+  
   const [selectedDeck, setSelectedDeck] = useState(PRESET_DECKS[0]);
   const [selectedEntry, setSelectedEntry] = useState<DeckEntry | null>(null);
   const [incomingSignal, setIncomingSignal] = useState<DeckEntry | null>(null);
   const [showDeckPicker, setShowDeckPicker] = useState(false);
   const [lastGesture, setLastGesture] = useState<GestureType | null>(null);
+
+  // Handle incoming signals from connection
+  useEffect(() => {
+    if (realIncomingSignal) {
+      setIncomingSignal(realIncomingSignal.entry);
+    }
+  }, [realIncomingSignal]);
 
   const handleConnect = useCallback(() => {
     router.push('/pair');
@@ -49,28 +68,27 @@ export default function ConnectScreen() {
     
     // Find matching entry in deck
     const matchingEntry = selectedDeck.entries.find(e => e.gesture === gesture);
-    if (matchingEntry && connectionState === CONNECTION_STATES.CONNECTED) {
-      // Simulate sending signal
+    if (matchingEntry && isConnected) {
+      // Set entry to send
       setSelectedEntry(matchingEntry);
-      // In real app, this would send via WebRTC/Socket
     }
-  }, [selectedDeck, connectionState]);
+  }, [selectedDeck, isConnected]);
 
-  const handleSendSignal = useCallback(() => {
-    if (selectedEntry) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Simulate receiving for demo
-      setTimeout(() => {
-        setIncomingSignal(selectedEntry);
-      }, 500);
+  const handleSendSignal = useCallback(async () => {
+    if (selectedEntry && isConnected) {
+      const success = await sendConnectionSignal(selectedEntry);
+      if (success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
       setSelectedEntry(null);
     }
-  }, [selectedEntry]);
+  }, [selectedEntry, isConnected, sendConnectionSignal]);
 
   const handleConfirm = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => setIncomingSignal(null), 1500);
-  }, []);
+    clearIncomingSignal();
+    setIncomingSignal(null);
+  }, [clearIncomingSignal]);
 
   const handleConfused = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -79,21 +97,15 @@ export default function ConnectScreen() {
 
   const handleReject = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    clearIncomingSignal();
     setIncomingSignal(null);
-  }, []);
+  }, [clearIncomingSignal]);
 
-  // Demo: Toggle connection state
-  const handleDemoConnect = useCallback(() => {
-    if (connectionState === CONNECTION_STATES.DISCONNECTED) {
-      setConnectionState(CONNECTION_STATES.CONNECTING);
-      setTimeout(() => {
-        setConnectionState(CONNECTION_STATES.CONNECTED);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }, 1500);
-    } else {
-      setConnectionState(CONNECTION_STATES.DISCONNECTED);
-    }
-  }, [connectionState]);
+  // Disconnect from partner
+  const handleDisconnect = useCallback(async () => {
+    await disconnect();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, [disconnect]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -126,12 +138,12 @@ export default function ConnectScreen() {
         {/* Connection Status */}
         <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
           <ConnectionStatus
-            state={connectionState}
-            sessionId={connectionState === CONNECTION_STATES.CONNECTED ? 'XK7D42' : undefined}
-            partnerName={connectionState === CONNECTION_STATES.CONNECTED ? 'Partner' : undefined}
+            state={connectionStatus}
+            sessionId={isConnected ? connection?.sessionCode : undefined}
+            partnerName={isConnected ? 'Partner' : undefined}
           />
           
-          {connectionState === CONNECTION_STATES.DISCONNECTED && (
+          {!isConnected && (
             <View style={styles.connectActions}>
               <Button
                 title="Scan QR to Connect"
@@ -140,12 +152,25 @@ export default function ConnectScreen() {
                 icon={<QrCode size={20} color={colors.text.primary} style={{ marginRight: spacing.sm }} />}
                 fullWidth
               />
+              {isConnected && (
+                <Button
+                  title="Disconnect"
+                  onPress={handleDisconnect}
+                  variant="outline"
+                  fullWidth
+                  style={{ marginTop: spacing.sm }}
+                />
+              )}
+            </View>
+          )}
+          
+          {isConnected && (
+            <View style={styles.connectActions}>
               <Button
-                title="Demo Mode"
-                onPress={handleDemoConnect}
+                title="Disconnect"
+                onPress={handleDisconnect}
                 variant="outline"
                 fullWidth
-                style={{ marginTop: spacing.sm }}
               />
             </View>
           )}
@@ -186,7 +211,7 @@ export default function ConnectScreen() {
             />
           </Card>
           
-          {selectedEntry && connectionState === CONNECTION_STATES.CONNECTED && (
+          {selectedEntry && isConnected && (
             <Button
               title={`Send "${selectedEntry.meaning}"`}
               onPress={handleSendSignal}
@@ -198,14 +223,14 @@ export default function ConnectScreen() {
         </Animated.View>
 
         {/* Tap Area */}
-        {connectionState === CONNECTION_STATES.CONNECTED && (
+        {isConnected && (
           <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.section}>
             <Text variant="label" color="secondary" style={styles.sectionLabel}>
               GESTURE INPUT
             </Text>
             <TapArea
               onGesture={handleGesture}
-              disabled={connectionState !== CONNECTION_STATES.CONNECTED}
+              disabled={!isConnected}
             />
           </Animated.View>
         )}
