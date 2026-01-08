@@ -1,0 +1,190 @@
+1 — Elevator pitch
+
+An app where two people (or a group) create and share meaning without typing or speaking. They build a shared visual / haptic language (micro-gestures, looks, lights, patterns) and use that private language to communicate in real time. A companion learning mode shows how secret signaling has worked in history, then lets users safely encode short messages into art, rhythm or subtle signals (for learning & playful use, not for wrongdoing).
+
+2 — Core product pillars
+
+Shared Intent — immediate, zero-words mutual understanding through gestures, touch, light, and tiny visual signals.
+
+Secret Signals (Edu + Play) — interactive lessons on historical codes + play mode to encode short messages into images, beats or motion.
+
+Privacy-first connectivity — pairing by QR or local P2P; all sensitive data stays on device unless user opts in.
+
+Accessible & inclusive — supports visual, auditory and haptic channels so diverse users can participate.
+
+3 — Key features (by priority)
+Essential (MVP)
+
+Pair & Sync: pair two devices with QR, ephemeral code, or local Wi-Fi / Bluetooth.
+
+Shared Dictionary: quick creation of a “mini language”: map an icon/gesture to a meaning (e.g., tap-tap = “go”, eye icon = “safe”). Stored locally.
+
+Live Nonverbal Channel: transmit short signals: taps (touchscreen), patterned vibration (haptics), short light flashes (screen), and emoji/shape displays. Receiver shows the mapped meaning.
+
+Mutual Confirmation UI: simple two-tap confirmation flow so both sides know they understood the same meaning.
+
+History & Lessons: interactive timeline of historical codes (semaphores, Morse, invisible ink, carrier pigeons, hand signals). Educational only.
+
+Local ML Gesture Classifier (optional MVP lite): onboard simple gesture recognition (e.g., drawn pattern or tap rhythm) using on-device model.
+
+Nice-to-have (stretch)
+
+P2P Offline Mode: WebRTC/peer sockets for local direct exchange without server.
+
+Steganography Art Encoder (education/play): hide a 6-character code inside an image or music clip for fun (note: show only educational implementations and don’t give tools that facilitate wrongdoing).
+
+Group mode: shared intent among many participants (e.g., a 5-icon deck).
+
+Accessibility channels: visuals for deaf users, haptic-first for blind users, or voice-free screen reader compatibility.
+
+Analytics & learning: "language health" stats (most used gestures, confusion rates). Local analytics only unless user opts in.
+
+4 — How the two riddles map to product interaction
+Riddle 1 — “Imagine two minds sharing a secret with no words or sound — how would they know they understand each other?”
+
+Flow:
+
+Pair devices (QR or proximity). They generate a short ephemeral key.
+
+Each creates a short “mini-dictionary” of 6 mappings (icon/gesture → meaning). Example preset packs: travel, emergency, strategy, celebration.
+
+Sender uses gesture: double-tap + screen icon. Device sends compact signal (code) over secure channel.
+
+Receiver’s UI shows the icon + mapped meaning. Both users tap a “✓ I got it” button — the app records a “mutual confirmation” pulse (visual animation). If receiver mismatches, they can quickly “flag” and propose a tweak.
+
+Optional: If enabled, the app shows a minimal evidence of agreement (shared animation + ephemeral glow) — the “two minds” visual.
+
+Key UX notes: confirm — don’t guess. The app must always require a tiny explicit confirmation so “they know they understand each other.”
+
+Riddle 2 — “Throughout history, how have secrets traveled unseen...”
+
+Product pieces:
+
+Timeline learning module: short cards on semaphore flags, Morse, knitting codes, invisible ink, carrier pigeons, hand signs, smoke signals, and diplomatic cipher basics.
+
+Interactive mini-games: decode a sample Morse, send a semaphore sequence, reassemble a shredded letter, match a historic code to its era.
+
+Safe steganography demo: let users hide a chosen emoji/code into an image using LSB-style visual embedding for educational demonstration — we explicitly label limitations and ethical guidelines. (No instruction for evasion or illegal use; keep it playful/academic.)
+
+5 — UX / UI concepts
+
+Clean, minimal mobile-first UI. Large central canvas for signals (icons, colors, animations).
+
+Two main tabs: Connect (pairing + live signals) and Learn & Play (history + encoding games).
+
+On Connect: left half shows your “deck” of 6 icons; right half shows live incoming signal, meaning, and a confirm button.
+
+Use large haptic button for blind users; add an accessibility toggle to swap to haptic-first mode.
+
+Feedback animations when both confirm: “thought link” pulse connecting both screens (fun visual for demos).
+
+Wireframe (verbal):
+
+Top: paired user avatar & ephemeral session name.
+
+Middle-left: your gestures / quick-send icons.
+
+Middle-right: incoming card with icon, mapped word, confirm / flag buttons.
+
+Bottom: "Create Dictionary" edit button + "Teach" (share your deck as QR for others).
+
+6 — Technical architecture
+Client (mobile)
+
+Framework: React Native (Expo) or Flutter (Expo is aligned with your Next.js/MERN background; React Native suits web parity).
+
+Offline ML: TensorFlow Lite / on-device classifier for gesture recognition.
+
+Connectivity: WebRTC (data channel) for P2P; fallback to server relay via WebSocket (Socket.IO).
+
+Crypto: use WebCrypto / libsodium for ephemeral keys and message integrity. Use Diffie-Hellman or X25519 for session key agreement (use library, not homebrew).
+
+Storage: local encrypted storage for dictionaries and session metadata (e.g., SQLite or device secure storage).
+
+Backend (optional, for non-P2P)
+
+Node.js + Express (or Fastify), Socket.IO for relays, Redis for ephemeral sessions (TTL), MongoDB for opt-in analytics.
+
+REST for account management (if accounts exist). But MVP can be accountless: ephemeral sessions only.
+
+Data flow (pairing)
+
+Device A generates session token; shows QR.
+
+Device B scans QR → both derive session key via ephemeral exchange.
+
+Use session key to encrypt short signals; send via WebRTC or server relay.
+
+On-device ML (gesture recognition)
+
+Train small classifier to map accelerometer/touch patterns to gestures. For hackathon, use rule-based detection (tap sequences, swipe directions) and give ML as stretch.
+
+7 — Data model (local-first)
+
+Session { id, ephemeralKey, createdAt, participants[] }
+
+Deck { id, name, entries: [{iconId, gesturePattern, meaningText}] }
+
+Signal { id, sessionId, from, to, code, timestamp, confirmed }
+
+LearningProgress { moduleId, completed, score } — optional local.
+
+No persistent personal data required. Server stores only TTL session metadata if used as relay.
+
+8 — Security, privacy & ethics
+
+Privacy by default: no user accounts required, all decks and messages stored encrypted on device.
+
+Ephemeral sessions: sessions auto-expire after short TTL (e.g., 24 hours).
+
+No face data retention: if you include camera-based gaze/eye-detection, do on-device processing and never store raw images. Provide clear consent UI.
+
+Abuse prevention / ethics: include clear terms forbidding illegal use. The historical & steganography features are educational. Avoid enabling anonymity for harmful activities — include a reporting channel if you launch servers.
+
+Safety note in-app: explicit educational disclaimer before any steganography demos.
+
+9 — MVP feature list (one-week hackathon scope)
+
+Pairing via QR (works locally or via relay).
+
+Create a 6-icon “deck” (map icons ↔ meanings).
+
+Send & receive minimal signals (tap, vibration pattern, emoji/shape).
+
+Mutual confirmation flow & session visuals.
+
+Learning timeline with 6 historical items + one decoding mini-game.
+
+Basic local storage of decks and session logs.
+
+Polished demo flow for judges.
+
+10 — Stretch goals (if time permits)
+
+Web demo (Next.js) to mirror device screen so judges can watch.
+
+Offline Bluetooth/Wi-Fi Direct pairing.
+
+Simple gesture recognition (two-tap, long-press, zigzag).
+
+Small on-device ML model to generalize user gestures.
+
+Group sessions (3–6 users) and collaborative language creation.
+
+11 — Technology stack (recommended)
+
+Mobile: React Native + Expo
+
+UI: React Native Paper or Tailwind RN style tokens
+
+Backend (if needed): Node.js + Express, Socket.IO for relays
+
+DB (opt-in): MongoDB Atlas (or none for MVP)
+
+Crypto: libsodium / TweetNaCl / WebCrypto
+
+P2P: WebRTC (data channels)
+
+On-device ML: TensorFlow Lite if you add gesture classification
+
+CI / Deploy: Vercel for web admin, Heroku / Render for relay (optional)
