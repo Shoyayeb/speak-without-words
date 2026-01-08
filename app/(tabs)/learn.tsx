@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { History, Gamepad2, Award } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Text, Button, Card, Modal } from '../../src/components/ui';
@@ -20,6 +20,25 @@ export default function LearnScreen() {
   const [showGame, setShowGame] = useState(false);
   const [gameScore, setGameScore] = useState<number | null>(null);
   const [currentGame, setCurrentGame] = useState<'morse' | 'semaphore' | 'cipher' | null>(null);
+
+  // Simple fade-in animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleModulePress = useCallback((module: LearningModule) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -51,7 +70,7 @@ export default function LearnScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
+        <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text variant="h1">Learn</Text>
           <Text variant="body" color="secondary">
             Discover how secrets traveled through history
@@ -59,7 +78,7 @@ export default function LearnScreen() {
         </Animated.View>
 
         {/* Featured Game Card */}
-        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Card variant="gradient" glowColor={colors.primary[500]}>
             <LinearGradient
               colors={colors.gradients.mystical}
@@ -87,7 +106,7 @@ export default function LearnScreen() {
         </Animated.View>
 
         {/* Timeline Header */}
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.sectionHeader}>
             <History size={20} color={colors.primary[500]} />
             <Text variant="h3" style={styles.sectionTitle}>
@@ -100,7 +119,7 @@ export default function LearnScreen() {
         </Animated.View>
 
         {/* Timeline */}
-        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.timeline}>
+        <Animated.View style={[styles.timeline, { opacity: fadeAnim }]}>
           {HISTORICAL_CODES.map((module, index) => (
             <TimelineCard
               key={module.id}

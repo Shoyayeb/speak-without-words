@@ -1,19 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withSequence,
-  runOnJS,
-} from 'react-native-reanimated';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Volume2, VolumeX } from 'lucide-react-native';
 import { Text } from '../ui/Text';
 import { Button } from '../ui/Button';
-import { IconButton } from '../ui/IconButton';
 import { Card } from '../ui/Card';
 import { colors, spacing, borderRadius } from '../../constants/theme';
 
@@ -38,38 +27,44 @@ const CHALLENGES = [
   { word: 'NO', hint: 'Negative' },
 ];
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export const MorseGame: React.FC<MorseGameProps> = ({ onComplete }) => {
   const [currentChallenge, setCurrentChallenge] = useState(0);
   const [input, setInput] = useState('');
   const [score, setScore] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   const challenge = CHALLENGES[currentChallenge];
   const targetMorse = challenge.word.split('').map(c => MORSE_CODE[c] || '').join(' ');
 
-  const dotScale = useSharedValue(1);
-  const dashScale = useSharedValue(1);
-  const feedbackOpacity = useSharedValue(0);
-  const feedbackColor = useSharedValue<string>(colors.accent.success);
+  const dotScale = useRef(new Animated.Value(1)).current;
+  const dashScale = useRef(new Animated.Value(1)).current;
+  const feedbackOpacity = useRef(new Animated.Value(0)).current;
+
+  const animateButton = (scale: Animated.Value) => {
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 0.8,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const handleDot = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    dotScale.value = withSequence(
-      withTiming(0.8, { duration: 50 }),
-      withSpring(1, { damping: 10 })
-    );
+    animateButton(dotScale);
     setInput(prev => prev + '.');
   }, []);
 
   const handleDash = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    dashScale.value = withSequence(
-      withTiming(0.8, { duration: 50 }),
-      withSpring(1, { damping: 10 })
-    );
+    animateButton(dashScale);
     setInput(prev => prev + '-');
   }, []);
 
@@ -88,17 +83,28 @@ export const MorseGame: React.FC<MorseGameProps> = ({ onComplete }) => {
     
     if (isCorrect) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      feedbackColor.value = colors.accent.success;
+      setFeedbackSuccess(true);
       setScore(prev => prev + 1);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      feedbackColor.value = colors.accent.error;
+      setFeedbackSuccess(false);
     }
     
-    feedbackOpacity.value = withSequence(
-      withTiming(1, { duration: 200 }),
-      withTiming(0, { duration: 1000 })
-    );
+    setFeedbackVisible(true);
+    Animated.sequence([
+      Animated.timing(feedbackOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(feedbackOpacity, {
+        toValue: 0,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setFeedbackVisible(false);
+    });
 
     // Move to next challenge
     setTimeout(() => {
@@ -111,19 +117,6 @@ export const MorseGame: React.FC<MorseGameProps> = ({ onComplete }) => {
       }
     }, 1500);
   }, [input, targetMorse, currentChallenge, score, onComplete]);
-
-  const dotStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: dotScale.value }],
-  }));
-
-  const dashStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: dashScale.value }],
-  }));
-
-  const feedbackStyle = useAnimatedStyle(() => ({
-    opacity: feedbackOpacity.value,
-    backgroundColor: feedbackColor.value,
-  }));
 
   return (
     <View style={styles.container}>
@@ -180,12 +173,20 @@ export const MorseGame: React.FC<MorseGameProps> = ({ onComplete }) => {
         <Text variant="h3" align="center" style={styles.inputText}>
           {input || '_ _ _'}
         </Text>
-        <Animated.View style={[styles.feedbackBar, feedbackStyle]} />
+        <Animated.View 
+          style={[
+            styles.feedbackBar, 
+            { 
+              opacity: feedbackOpacity,
+              backgroundColor: feedbackSuccess ? colors.accent.success : colors.accent.error,
+            }
+          ]} 
+        />
       </Card>
 
       {/* Controls */}
       <View style={styles.controls}>
-        <Animated.View style={dotStyle}>
+        <Animated.View style={{ transform: [{ scale: dotScale }] }}>
           <Button
             title="•"
             onPress={handleDot}
@@ -193,7 +194,7 @@ export const MorseGame: React.FC<MorseGameProps> = ({ onComplete }) => {
             style={styles.morseButton}
           />
         </Animated.View>
-        <Animated.View style={dashStyle}>
+        <Animated.View style={{ transform: [{ scale: dashScale }] }}>
           <Button
             title="—"
             onPress={handleDash}

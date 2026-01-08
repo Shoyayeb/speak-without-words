@@ -1,16 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withDelay,
-  withSequence,
-  Easing,
-  interpolate,
-  SharedValue,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../constants/theme';
 
@@ -25,49 +14,63 @@ export const PulseAnimation: React.FC<PulseAnimationProps> = ({
   color = colors.primary[500],
   active = true,
 }) => {
-  const scale1 = useSharedValue(0);
-  const scale2 = useSharedValue(0);
-  const scale3 = useSharedValue(0);
+  const scale1 = useRef(new Animated.Value(0)).current;
+  const scale2 = useRef(new Animated.Value(0)).current;
+  const scale3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (active) {
-      scale1.value = withRepeat(
-        withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
-        -1,
-        false
-      );
-      scale2.value = withDelay(
-        400,
-        withRepeat(
-          withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
-          -1,
-          false
-        )
-      );
-      scale3.value = withDelay(
-        800,
-        withRepeat(
-          withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
-          -1,
-          false
-        )
-      );
+      const createPulseAnimation = (value: Animated.Value, delay: number) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(value, {
+              toValue: 1,
+              duration: 2000,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(value, {
+              toValue: 0,
+              duration: 0,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const anim1 = createPulseAnimation(scale1, 0);
+      const anim2 = createPulseAnimation(scale2, 400);
+      const anim3 = createPulseAnimation(scale3, 800);
+
+      anim1.start();
+      anim2.start();
+      anim3.start();
+
+      return () => {
+        anim1.stop();
+        anim2.stop();
+        anim3.stop();
+      };
     } else {
-      scale1.value = 0;
-      scale2.value = 0;
-      scale3.value = 0;
+      scale1.setValue(0);
+      scale2.setValue(0);
+      scale3.setValue(0);
     }
   }, [active]);
 
-  const createAnimatedStyle = (scale: SharedValue<number>) =>
-    useAnimatedStyle(() => ({
-      transform: [{ scale: interpolate(scale.value, [0, 1], [0.3, 1]) }],
-      opacity: interpolate(scale.value, [0, 0.5, 1], [0.8, 0.4, 0]),
-    }));
-
-  const animatedStyle1 = createAnimatedStyle(scale1);
-  const animatedStyle2 = createAnimatedStyle(scale2);
-  const animatedStyle3 = createAnimatedStyle(scale3);
+  const createAnimatedStyle = (scale: Animated.Value) => ({
+    transform: [{
+      scale: scale.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.3, 1],
+      }),
+    }],
+    opacity: scale.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.8, 0.4, 0],
+    }),
+  });
 
   const ringStyle = {
     width: size,
@@ -78,9 +81,9 @@ export const PulseAnimation: React.FC<PulseAnimationProps> = ({
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, animatedStyle1]} />
-      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, animatedStyle2]} />
-      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, animatedStyle3]} />
+      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, createAnimatedStyle(scale1)]} />
+      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, createAnimatedStyle(scale2)]} />
+      <Animated.View style={[ringStyle, styles.ring, { borderColor: color }, createAnimatedStyle(scale3)]} />
     </View>
   );
 };
@@ -90,34 +93,53 @@ interface ConnectionPulseProps {
 }
 
 export const ConnectionPulse: React.FC<ConnectionPulseProps> = ({ connected = false }) => {
-  const rotation = useSharedValue(0);
-  const glow = useSharedValue(0.3);
+  const rotation = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 8000, easing: Easing.linear }),
-      -1,
-      false
+    const rotationAnim = Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
     );
+    rotationAnim.start();
+
+    let glowAnim: Animated.CompositeAnimation | null = null;
     if (connected) {
-      glow.value = withRepeat(
-        withSequence(
-          withTiming(0.8, { duration: 1000 }),
-          withTiming(0.3, { duration: 1000 })
-        ),
-        -1,
-        false
+      glowAnim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glow, {
+            toValue: 0.8,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glow, {
+            toValue: 0.3,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
       );
+      glowAnim.start();
     }
+
+    return () => {
+      rotationAnim.stop();
+      if (glowAnim) glowAnim.stop();
+    };
   }, [connected]);
 
-  const rotationStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value,
-  }));
+  const rotationStyle = {
+    transform: [{
+      rotate: rotation.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      }),
+    }],
+  };
 
   return (
     <View style={styles.connectionContainer}>
@@ -130,7 +152,7 @@ export const ConnectionPulse: React.FC<ConnectionPulseProps> = ({ connected = fa
         />
       </Animated.View>
       {connected && (
-        <Animated.View style={[styles.glowCircle, glowStyle]}>
+        <Animated.View style={[styles.glowCircle, { opacity: glow }]}>
           <LinearGradient
             colors={['rgba(0, 206, 201, 0.4)', 'transparent']}
             style={styles.glowGradient}
@@ -150,25 +172,47 @@ export const SignalRipple: React.FC<SignalRippleProps> = ({
   trigger,
   color = colors.primary[500],
 }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
+  const scale = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (trigger > 0) {
-      scale.value = 0;
-      opacity.value = 1;
-      scale.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.ease) });
-      opacity.value = withTiming(0, { duration: 600, easing: Easing.out(Easing.ease) });
+      scale.setValue(0);
+      opacity.setValue(1);
+      
+      Animated.parallel([
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   }, [trigger]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value * 2 }],
-    opacity: opacity.value,
-  }));
-
   return (
-    <Animated.View style={[styles.ripple, { backgroundColor: color }, animatedStyle]} />
+    <Animated.View 
+      style={[
+        styles.ripple, 
+        { backgroundColor: color },
+        {
+          transform: [{
+            scale: scale.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 2],
+            }),
+          }],
+          opacity,
+        },
+      ]} 
+    />
   );
 };
 

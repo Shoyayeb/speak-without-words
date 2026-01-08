@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   Switch,
   Linking,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -22,7 +23,6 @@ import {
   Trash2,
   Github,
 } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Text, Card, Button } from '../../src/components/ui';
@@ -69,6 +69,25 @@ export default function SettingsScreen() {
   const [darkMode, setDarkMode] = useState(true);
   const [accessibilityMode, setAccessibilityMode] = useState(false);
 
+  // Simple fade-in animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const handleToggleHaptic = (value: boolean) => {
     setHapticEnabled(value);
     if (value) {
@@ -89,7 +108,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.header}>
+        <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text variant="h1">Settings</Text>
           <Text variant="body" color="secondary">
             Customize your experience
@@ -97,7 +116,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* Profile Section */}
-        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text variant="label" color="tertiary" style={styles.sectionLabel}>
             PROFILE
           </Text>
@@ -120,7 +139,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* Preferences Section */}
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text variant="label" color="tertiary" style={styles.sectionLabel}>
             PREFERENCES
           </Text>
@@ -171,7 +190,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* Accessibility Section */}
-        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text variant="label" color="tertiary" style={styles.sectionLabel}>
             ACCESSIBILITY
           </Text>
@@ -200,7 +219,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* Privacy Section */}
-        <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text variant="label" color="tertiary" style={styles.sectionLabel}>
             PRIVACY & DATA
           </Text>
@@ -222,7 +241,7 @@ export default function SettingsScreen() {
         </Animated.View>
 
         {/* About Section */}
-        <Animated.View entering={FadeInDown.delay(600).springify()} style={styles.section}>
+        <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text variant="label" color="tertiary" style={styles.sectionLabel}>
             ABOUT
           </Text>

@@ -1,14 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, Pressable, Dimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withSequence,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { 
+  View, 
+  StyleSheet, 
+  Pressable, 
+  Animated, 
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '../ui/Text';
@@ -21,17 +20,15 @@ interface TapAreaProps {
   disabled?: boolean;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export const TapArea: React.FC<TapAreaProps> = ({ onGesture, disabled = false }) => {
   const [rippleTrigger, setRippleTrigger] = useState(0);
   const [lastGesture, setLastGesture] = useState<string>('');
   const lastTapTime = useRef(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPress = useRef(false);
 
-  const scale = useSharedValue(1);
-  const borderOpacity = useSharedValue(0.5);
-  const pulseScale = useSharedValue(1);
+  const scale = useRef(new Animated.Value(1)).current;
+  const borderOpacity = useRef(new Animated.Value(0.5)).current;
 
   const triggerRipple = useCallback(() => {
     setRippleTrigger((prev) => prev + 1);
@@ -41,6 +38,30 @@ export const TapArea: React.FC<TapAreaProps> = ({ onGesture, disabled = false })
     setLastGesture(label);
     setTimeout(() => setLastGesture(''), 1500);
   }, []);
+
+  const animatePress = () => {
+    Animated.spring(scale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(borderOpacity, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animateRelease = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(borderOpacity, {
+      toValue: 0.5,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const handleTap = useCallback(() => {
     const now = Date.now();
@@ -73,100 +94,111 @@ export const TapArea: React.FC<TapAreaProps> = ({ onGesture, disabled = false })
     triggerRipple();
   }, [onGesture, triggerRipple, showGestureLabel]);
 
-  const tap = Gesture.Tap()
-    .enabled(!disabled)
-    .onStart(() => {
-      scale.value = withSpring(0.98, { damping: 15 });
-      borderOpacity.value = withTiming(1, { duration: 100 });
-    })
-    .onEnd(() => {
-      scale.value = withSpring(1, { damping: 15 });
-      borderOpacity.value = withTiming(0.5, { duration: 300 });
-      runOnJS(handleTap)();
-    });
-
-  const longPress = Gesture.LongPress()
-    .enabled(!disabled)
-    .minDuration(500)
-    .onStart(() => {
-      scale.value = withSpring(0.96, { damping: 15 });
-      pulseScale.value = withSequence(
-        withTiming(1.05, { duration: 200 }),
-        withTiming(1, { duration: 200 })
-      );
-    })
-    .onEnd(() => {
-      scale.value = withSpring(1, { damping: 15 });
-      runOnJS(handleLongPress)();
-    });
-
-  const pan = Gesture.Pan()
-    .enabled(!disabled)
-    .minDistance(50)
-    .onEnd((event) => {
-      const { translationX, translationY, velocityX, velocityY } = event;
-      
-      // Determine swipe direction
-      if (Math.abs(translationX) > Math.abs(translationY)) {
-        if (translationX > 0) {
-          runOnJS(onGesture)('swipe-right');
-          runOnJS(showGestureLabel)('Swipe Right');
-        } else {
-          runOnJS(onGesture)('swipe-left');
-          runOnJS(showGestureLabel)('Swipe Left');
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !disabled,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only become responder if there's significant movement
+        return !disabled && (Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10);
+      },
+      onPanResponderGrant: () => {
+        isLongPress.current = false;
+        animatePress();
+        
+        // Start long press timer
+        longPressTimer.current = setTimeout(() => {
+          isLongPress.current = true;
+          handleLongPress();
+          animateRelease();
+        }, 500);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // If moved significantly, cancel long press
+        if (Math.abs(gestureState.dx) > 20 || Math.abs(gestureState.dy) > 20) {
+          if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+          }
         }
-      } else {
-        if (translationY > 0) {
-          runOnJS(onGesture)('swipe-down');
-          runOnJS(showGestureLabel)('Swipe Down');
-        } else {
-          runOnJS(onGesture)('swipe-up');
-          runOnJS(showGestureLabel)('Swipe Up');
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
         }
-      }
-      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-      runOnJS(triggerRipple)();
-    });
-
-  const composed = Gesture.Race(longPress, tap, pan);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const borderStyle = useAnimatedStyle(() => ({
-    opacity: borderOpacity.value,
-  }));
+        
+        animateRelease();
+        
+        const { dx, dy } = gestureState;
+        const SWIPE_THRESHOLD = 50;
+        
+        // Check for swipe
+        if (Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          
+          if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) {
+              onGesture('swipe-right');
+              showGestureLabel('Swipe Right');
+            } else {
+              onGesture('swipe-left');
+              showGestureLabel('Swipe Left');
+            }
+          } else {
+            if (dy > 0) {
+              onGesture('swipe-down');
+              showGestureLabel('Swipe Down');
+            } else {
+              onGesture('swipe-up');
+              showGestureLabel('Swipe Up');
+            }
+          }
+          triggerRipple();
+        } else if (!isLongPress.current) {
+          // It was a tap
+          handleTap();
+        }
+      },
+      onPanResponderTerminate: () => {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+        animateRelease();
+      },
+    })
+  ).current;
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={composed}>
-        <Animated.View style={[styles.touchArea, animatedStyle]}>
-          <LinearGradient
-            colors={[colors.surface.default, colors.background.secondary]}
-            style={styles.gradient}
-          >
-            <Animated.View style={[styles.border, borderStyle]} />
-            <SignalRipple trigger={rippleTrigger} color={colors.primary[400]} />
-            
-            <View style={styles.content}>
-              <Text variant="h3" color="secondary" align="center">
-                👆
-              </Text>
-              <Text variant="body" color="tertiary" align="center" style={styles.hint}>
-                Tap, hold, or swipe to send
-              </Text>
-              {lastGesture ? (
-                <View style={styles.gestureBadge}>
-                  <Text variant="caption" color="primary" weight="semibold">
-                    {lastGesture}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </LinearGradient>
-        </Animated.View>
-      </GestureDetector>
+      <Animated.View 
+        style={[styles.touchArea, { transform: [{ scale }] }]}
+        {...panResponder.panHandlers}
+      >
+        <LinearGradient
+          colors={[colors.surface.default, colors.background.secondary]}
+          style={styles.gradient}
+        >
+          <Animated.View style={[styles.border, { opacity: borderOpacity }]} />
+          <SignalRipple trigger={rippleTrigger} color={colors.primary[400]} />
+          
+          <View style={styles.content}>
+            <Text variant="h3" color="secondary" align="center">
+              👆
+            </Text>
+            <Text variant="body" color="tertiary" align="center" style={styles.hint}>
+              Tap, hold, or swipe to send
+            </Text>
+            {lastGesture ? (
+              <View style={styles.gestureBadge}>
+                <Text variant="caption" color="primary" weight="semibold">
+                  {lastGesture}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </LinearGradient>
+      </Animated.View>
     </View>
   );
 };
